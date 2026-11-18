@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#6E1423"/>
+  <circle cx="256" cy="246" r="172" fill="#F2B705"/>
+  <rect x="70" y="372" width="372" height="60" fill="#6E1423"/>
+  <path d="M96 374 L416 374" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+  <!-- caballo blanco -->
+  <g fill="#FFFFFF" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M178 276 C150 264 120 278 104 314 C122 304 136 302 148 306 C136 318 128 332 126 348 C146 326 166 310 182 300 Z" stroke-width="2"/>
+    <path stroke-width="2" d="M170 282 C176 256 230 250 290 254 C302 255 314 252 322 244 L342 206 L350 180 L362 196 C380 198 396 210 410 228
+      C414 236 408 242 398 240 L378 234 L366 254 C360 270 356 290 348 306 C336 326 300 334 250 334 C210 334 176 322 170 300 Z"/>
+    <g fill="none" stroke-width="17">
+      <path d="M332 312 L366 322 L396 306"/>
+      <path d="M318 322 L330 346 L350 362"/>
+      <path d="M200 318 L176 342 L146 356"/>
+      <path d="M220 326 L206 350 L214 370"/>
+    </g>
+  </g>
+  <!-- vaquero vino tinto -->
+  <g fill="#6E1423" stroke="#6E1423" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="2" d="M254 262 L248 228 C248 212 258 204 272 204 C286 204 294 214 294 228 L296 240 L336 228 L340 238 L298 254 L286 252 L282 262 Z"/>
+    <path d="M268 258 L288 290 L284 310 L300 312" fill="none" stroke-width="14"/>
+    <circle cx="276" cy="188" r="14"/>
+    <path stroke-width="2" d="M242 176 C256 182 298 182 312 172 C310 182 302 186 292 186 L262 186 C252 186 246 182 242 176 Z"/>
+    <path stroke-width="2" d="M260 180 C259 160 266 150 276 155 C286 150 293 160 292 180 Z"/>
+    <path d="M256 214 L236 176 L228 150" stroke-width="12" fill="none"/>
+    <ellipse cx="212" cy="124" rx="38" ry="16" fill="none" stroke-width="6" transform="rotate(-12 212 124)"/>
+    <path d="M336 232 L364 236" stroke-width="3" fill="none"/>
+  </g>
+</svg>
