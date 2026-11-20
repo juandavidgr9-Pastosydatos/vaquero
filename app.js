@@ -1,6 +1,6 @@
 'use strict';
 /* Vaquero - Pastos & Datos. Todo vive en el equipo (IndexedDB "vaquero"). Basada en Corral 5.2.0. */
-const VERSION = '1.0.2';
+const VERSION = '1.0.3';
 const BACKUP_SHEET = '_respaldo', APP_ID = 'APP_VAQUERO';
 const CFG = { recordarCada: 10 };   // cada cuántos cambios recuerda descargar el Excel
 const EA_TXT = {VP:'Vaca Parida',VS:'Vaca Seca',NV:'Novilla Vientre',HL:'Hembra Levante',CH:'Cría Hembra',CM:'Cría Macho',TR:'Toro',ML:'Macho Levante'};
@@ -85,6 +85,14 @@ function indexar(){
     if(esCria(a) && a.madre){ if(!crias.has(a.madre)) crias.set(a.madre,[]); crias.get(a.madre).push(id); } }
 }
 const criasDe = a => (crias.get(a.id)||[]).map(i=>animals.get(i));
+/* Se mueven juntos: si es vaca, con sus crías; si es cría, con su madre y las otras crías de la madre */
+function companeros(a){
+  if(esCria(a)&&a.madre&&animals.has(a.madre)){ const m=animals.get(a.madre); return [m,...criasDe(m).filter(c=>c.id!==a.id)]; }
+  return criasDe(a);
+}
+const ACOMP = m => m==='Con madre'||m==='Con su cría';
+const acompTxt = m => m==='Con madre'?' · con la madre':m==='Con su cría'?' · con su cría':'';
+const nombreComp = (c,a) => c.id===a.madre?`madre ${c.id}`:`cría ${c.id}`;
 const stripZ = s => s.replace(/^0+(?=[0-9A-Z])/,'');
 const norm = s => stripZ(String(s).toUpperCase().replace(/^TORO\s*/,'').replace(/\s+/g,''));
 function buscar(qRaw){
@@ -257,7 +265,7 @@ function viewFicha(a){
   const hist=(a.w.hist||[]).slice().reverse();
   return `<div class="card">${head(a)}${kv(datos)}</div>${comentHTML(a)}${nota}<!--R-->
   ${extra}
-  ${hist.length?`<div class="card"><h3>Movimientos de hoy en adelante</h3>${hist.map(h=>`<p>${esc(h.de)} → <b>${esc(h.a)}</b> <small>${fmtTs(h.ts)}${h.motivo==='Con madre'?' · con la madre':''}</small></p>`).join('')}</div>`:''}
+  ${hist.length?`<div class="card"><h3>Movimientos de hoy en adelante</h3>${hist.map(h=>`<p>${esc(h.de)} → <b>${esc(h.a)}</b> <small>${fmtTs(h.ts)}${acompTxt(h.motivo)}</small></p>`).join('')}</div>`:''}
   <button class="big" data-go="mov" data-id="${esc(a.id)}">Mover este animal</button>`;
 }
 
@@ -271,45 +279,43 @@ function rapidos(a){
 }
 function viewMover(a){
   const s=S.mov, cur=loteNow(a);
-  const cs=criasDe(a).filter(c=>s.dest?loteNow(c)!==s.dest:true);
+  const cs=companeros(a).filter(c=>s.dest?loteNow(c)!==s.dest:true);
   const q=rapidos(a);
   const lotes=meta.lotes.filter(l=>l!==cur);
-  const madre=esCria(a)&&a.madre&&animals.get(a.madre);
   let h=`<div class="card">${head(a)}<p style="margin-top:8px">Lote actual</p><div class="lotebig">${esc(cur)}</div>
   ${kv([['Categoría',`${a.ea} ${EA_TXT[a.ea]||''}`],['Color',colorTxt(a)],['I.E. / chapeta',ieTxt(a)],esCria(a)?['Edad',edadMDTxt(a)]:['Edad',edadAdulto(a)]])}</div>${comentHTML(a)}`;
-  if(cs.length) h+=`<div class="alert b">Se mueve${cs.length>1?'n':''} también con la madre: ${cs.map(c=>`cría ${esc(c.id)} (${esc(c.ea)}${loteNow(c)!==cur?`, hoy en ${esc(loteNow(c))}`:''})`).join(', ')}.</div>`;
-  if(madre) h+=`<div class="alert a">Es una cría: su madre ${esc(madre.id)} está en ${esc(loteNow(madre))}. Se moverá sola.</div>`;
+  if(cs.length) h+=`<div class="alert b">Se mueve${cs.length>1?'n':''} también: ${cs.map(c=>`${esc(nombreComp(c,a))} (${esc(c.ea)}${loteNow(c)!==cur?`, hoy en ${esc(loteNow(c))}`:''})`).join(', ')}.</div>`;
   h+='<!--R-->';
   if(a.w.mov) h+=`<div class="alert b">Ya se movió: ${esc(a.w.mov.de)} → ${esc(a.w.mov.a)} el ${fmtTs(a.w.mov.ts)}.</div>`;
   if(q.length) h+=`<div class="quick"><small>Mover rápido (últimos lotes usados)</small><div class="opts">${q.map(l=>`<button class="opt ${s.dest===l?'on':''}" data-qmov="${esc(l)}">→ ${esc(l)}</button>`).join('')}</div></div>`;
   h+=`<div class="field"><label for="fDest">${q.length?'U otro lote':'Mover al lote'}</label><select id="fDest" data-f="dest"><option value="">Elija el lote</option>${lotes.map(l=>`<option ${s.dest===l?'selected':''}>${esc(l)}</option>`).join('')}<option value="__otro">Otro lote nuevo…</option></select></div>`;
-  h+=`<div class="savebar"><button class="big" data-a="saveMov" ${s.dest?'':'disabled'}>${s.dest?`Mover a ${esc(s.dest)}${cs.length?` (+${cs.length} cría${cs.length>1?'s':''})`:''}`:'Elija el lote destino'}</button></div>`;
+  h+=`<div class="savebar"><button class="big" data-a="saveMov" ${s.dest?'':'disabled'}>${s.dest?`Mover a ${esc(s.dest)}${cs.length?` con ${esc(cs.map(c=>nombreComp(c,a)).join(', '))}`:''}`:'Elija el lote destino'}</button></div>`;
   return h;
 }
-function moverW(x,dest,motivo,ts){
+function moverW(x,dest,motivo,ts,con){
   const w=clone(x.w), prev=loteNow(x);
-  w.hist=[...(w.hist||[]),{de:prev,a:dest,motivo,ts}];
-  if(dest===x.lote) delete w.mov; else w.mov={de:x.lote,a:dest,motivo,ts};
+  w.hist=[...(w.hist||[]),{de:prev,a:dest,motivo,ts,con}];
+  if(dest===x.lote) delete w.mov; else w.mov={de:x.lote,a:dest,motivo,ts,con};
   w.ts=ts; return w;
 }
 async function saveMov(){
   const s=S.mov, a=animals.get(s.id), dest=s.dest; if(!a||!dest) return;
   if(dest===loteNow(a)) return alertBox('Mismo lote',`${a.id} ya está en ${dest}.`);
-  const ts=stamp(), cs=criasDe(a).filter(c=>loteNow(c)!==dest);
+  const ts=stamp(), cs=companeros(a).filter(c=>loteNow(c)!==dest);
   recordarMov(loteNow(a),dest);
-  const ch=[[a,moverW(a,dest,'Movimiento',ts)],...cs.map(c=>[c,moverW(c,dest,'Con madre',ts)])];
+  const ch=[[a,moverW(a,dest,'Movimiento',ts)],...cs.map(c=>[c,moverW(c,dest,c.id===a.madre?'Con su cría':'Con madre',ts,a.id)])];
   const prev=ch.map(([x])=>[x,clone(x.w)]);
   await commit(ch,1);
   S.mov={}; render();
-  toast(`✓ ${a.id} → ${dest}${cs.length?` con cría ${cs.map(c=>c.id).join(', ')}`:''}`, async()=>{ await commit(prev,-1); });
+  toast(`✓ ${a.id} → ${dest}${cs.length?` con ${cs.map(c=>nombreComp(c,a)).join(', ')}`:''}`, async()=>{ await commit(prev,-1); });
   recordatorio();
 }
-/* Deshace el último movimiento de un animal (y de las crías movidas con él) */
+/* Deshace el último movimiento de un animal (y de la madre o crías movidas con él) */
 async function deshacer(id){
   const a=animals.get(id), h=a?.w.hist; if(!h||!h.length) return;
   const last=h[h.length-1];
-  const hijos=criasDe(a).filter(c=>{ const x=c.w.hist; return x&&x.length&&x[x.length-1].ts===last.ts&&x[x.length-1].motivo==='Con madre'; });
-  if(!await confirmBox('Deshacer movimiento',`${id} vuelve de ${last.a} a ${last.de}${hijos.length?` con la cría ${hijos.map(c=>c.id).join(', ')}`:''}.`,'Deshacer',true)) return;
+  const hijos=companeros(a).filter(c=>{ const x=c.w.hist; return x&&x.length&&x[x.length-1].ts===last.ts&&ACOMP(x[x.length-1].motivo); });
+  if(!await confirmBox('Deshacer movimiento',`${id} vuelve de ${last.a} a ${last.de}${hijos.length?` con ${hijos.map(c=>nombreComp(c,a)).join(', ')}`:''}.`,'Deshacer',true)) return;
   const back=x=>{ const w=clone(x.w); w.hist.pop(); const p=w.hist[w.hist.length-1];
     if(p&&p.a!==x.lote) w.mov={de:x.lote,a:p.a,motivo:p.motivo,ts:p.ts}; else delete w.mov; w.ts=stamp(); return w; };
   await commit([[a,back(a)],...hijos.map(c=>[c,back(c)])],1);
@@ -326,7 +332,7 @@ function movResumen(){
   }
   return [...g.values()].sort((x,y)=>x.de.localeCompare(y.de,'es')||y.n-x.n||x.a.localeCompare(y.a,'es'));
 }
-const motTxt = r => [['Movimiento','Manual'],['Con madre','Con la madre']].filter(([m])=>r.mot[m]).map(([m,t])=>`${t} ${r.mot[m]}`).join(' · ');
+const motTxt = r => [['Movimiento','Manual'],['Con madre','Con la madre'],['Con su cría','Con su cría']].filter(([m])=>r.mot[m]).map(([m,t])=>`${t} ${r.mot[m]}`).join(' · ');
 function conteoLotes(){
   const ini={}, hoy={};
   for(const id of order){ const a=animals.get(id); ini[a.lote]=(ini[a.lote]||0)+1; const l=loteNow(a); hoy[l]=(hoy[l]||0)+1; }
@@ -341,7 +347,7 @@ function viewMov(){
   const top=`<div class="secthead"><h2>Movimientos realizados</h2><button class="close" data-a="volverMov">← Mover</button></div>`;
   if(!movRows.length&&!historial().length) return top+'<p class="hint">Aún no se ha movido ningún animal de lote.</p>';
   const lotesO=new Set(movRows.map(r=>r.de)).size, lotesD=new Set(movRows.map(r=>r.a)).size;
-  const ult=historial().filter(x=>x.motivo!=='Con madre').slice(0,30);
+  const ult=historial().filter(x=>!ACOMP(x.motivo)).slice(0,30);
   return `${top}<div class="stats" style="grid-template-columns:repeat(3,1fr)"><div><b>${tot}</b><small>Animales movidos</small></div><div><b>${lotesO}</b><small>Lotes de origen</small></div><div><b>${lotesD}</b><small>Lotes de destino</small></div></div>
   ${movRows.length?`<table class="mtab"><thead><tr><th>Lote origen</th><th></th><th>Lote destino</th><th class="n">Movidos</th><th class="n">Quedan en origen</th></tr></thead><tbody>
   ${movRows.map((r,i)=>`<tr data-mv="${i}"><td><b>${esc(r.de)}</b></td><td class="ar">→</td><td><b>${esc(r.a)}</b><small>${esc(motTxt(r))}</small></td><td class="n">${r.n}</td><td class="n">${hoy[r.de]||0}<small>de ${ini[r.de]||0}</small></td></tr>`).join('')}
@@ -353,7 +359,7 @@ function verMov(i){
   const r=movRows[i]; if(!r) return;
   modal(`<div class="chead"><div class="num" style="font-size:calc(24px*var(--k))">${esc(r.de)} → ${esc(r.a)}</div><button class="close" data-a="closeM">Cerrar</button></div>
   <p class="hint">${r.n} animales · ${esc(motTxt(r))}</p>
-  <div class="plist">${r.ids.map(id=>{const a=animals.get(id);return `<div class="hrow"><div><b>${esc(id)}</b><small>${esc(a.ea)} · ${esc(colorTxt(a))} · ${esc(ieTxt(a))}${a.w.mov.motivo==='Con madre'?' · con la madre':''}</small></div>${a.w.mov.motivo==='Con madre'?'':`<button class="undo" data-undo="${esc(id)}">Deshacer</button>`}</div>`;}).join('')}</div>`);
+  <div class="plist">${r.ids.map(id=>{const a=animals.get(id);return `<div class="hrow"><div><b>${esc(id)}</b><small>${esc(a.ea)} · ${esc(colorTxt(a))} · ${esc(ieTxt(a))}${acompTxt(a.w.mov.motivo)}</small></div>${ACOMP(a.w.mov.motivo)?'':`<button class="undo" data-undo="${esc(id)}">Deshacer</button>`}</div>`;}).join('')}</div>`);
 }
 
 /* ---------- inventario por lote y categoría ---------- */
@@ -473,11 +479,11 @@ function construirExcel(){
   const wb=XLSX.utils.book_new(), all=order.map(i=>animals.get(i));
   hoja(wb,'Inventario',['Número','Sexo','EA','Color','I.E.','Madre','Lote inicial','Lote actual','Movido','Fecha movimiento','Hora movimiento','Estado reprod.','Comentario','Alertas comentario'],
     all.map(a=>[a.id,a.sexo,a.ea,a.color,ieTxt(a),a.madre||'',a.lote,loteNow(a),a.w.mov?'SI':'NO',fecha(a.w.mov?.ts),hora(a.w.mov?.ts),a.estado||'',a.coment||'',claves(a).join(', ')]));
-  const H=historial().reverse().map(x=>{ const a=animals.get(x.id); return [x.id,a.ea,x.de,x.a,x.motivo==='Con madre'?`Con la madre ${a.madre}`:'Manual',fecha(x.ts),hora(x.ts)]; });
+  const H=historial().reverse().map(x=>{ const a=animals.get(x.id); return [x.id,a.ea,x.de,x.a,x.motivo==='Con madre'?`Con la madre ${x.con||a.madre}`:x.motivo==='Con su cría'?`Con su cría ${x.con||''}`:'Manual',fecha(x.ts),hora(x.ts)]; });
   hoja(wb,'Movimientos',['Número','EA','Lote anterior','Lote nuevo','Motivo','Fecha','Hora'],H);
-  const CL=conteoLotes(), RM=movResumen().map(r=>[r.de,r.a,r.mot.Movimiento||0,r.mot['Con madre']||0,r.n,CL.ini[r.de]||0,CL.hoy[r.de]||0]);
-  if(RM.length) RM.push(['TOTAL','',...[2,3,4].map(c=>RM.reduce((s,r)=>s+r[c],0)),'','']);
-  hoja(wb,'Resumen movimientos',['Lote origen','Lote destino','Movimiento manual','Con la madre','Total animales','Había en origen','Quedan en origen'],RM);
+  const CL=conteoLotes(), RM=movResumen().map(r=>[r.de,r.a,r.mot.Movimiento||0,r.mot['Con madre']||0,r.mot['Con su cría']||0,r.n,CL.ini[r.de]||0,CL.hoy[r.de]||0]);
+  if(RM.length) RM.push(['TOTAL','',...[2,3,4,5].map(c=>RM.reduce((s,r)=>s+r[c],0)),'','']);
+  hoja(wb,'Resumen movimientos',['Lote origen','Lote destino','Movimiento manual','Con la madre','Con su cría','Total animales','Había en origen','Quedan en origen'],RM);
   for(const [modo,nom] of [['inicial','Inv. lote inicial'],['actual','Inv. lote actual']]){
     const {t,cols,lotes}=tablaLotes(modo);
     const rows=lotes.map(l=>{ const v=cols.map(c=>t[l][c]||0); return [l,...v,v.reduce((a,b)=>a+b,0)]; });
@@ -516,19 +522,23 @@ async function enviar(){
     catch(e){ if(e.name!=='AbortError') toast('No se pudo enviar. Use Descargar Excel.'); }
   } else return enviarAndroid(name,blob);
 }
-/* Chrome en Android solo deja compartir imágenes, audio, video, PDF y texto, no Excel.
-   Se guarda el Excel en Descargas y se abre WhatsApp para adjuntarlo como documento. */
-async function enviarAndroid(name,blob){
+/* Chrome en Android solo deja compartir imágenes, audio, video, PDF y texto: no deja pasar
+   un Excel directo a WhatsApp. Se hace en 2 pasos: guardar en el equipo y adjuntarlo en WhatsApp. */
+function bajar(name,blob){
   const url=URL.createObjectURL(blob), a=document.createElement('a');
   a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),30000);
-  await marcarDescargado();
-  modal(`<h2>Enviar el Excel</h2><div class="alert g">El archivo quedó guardado en Descargas:<br><b>${esc(name)}</b></div>
-  <p>Este equipo no deja compartir archivos Excel directo desde la app. Envíelo así:</p>
-  <ol class="pasos"><li>Toque <b>Abrir WhatsApp</b> y elija el chat.</li><li>Toque el clip 📎 → <b>Documento</b>.</li><li>Elija <b>${esc(name)}</b> (sale de primero en recientes o en la carpeta Descargas).</li></ol>
-  <a class="big wa" href="https://wa.me/?text=${encodeURIComponent('Excel de Vaquero: '+name)}" target="_blank" rel="noopener">Abrir WhatsApp</a>
-  <p class="hint" style="text-align:left">Para Drive: abra la app Drive → <b>+</b> → <b>Subir</b> → Descargas → elija el archivo.</p>
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+function enviarAndroid(name,blob){
+  const m=modal(`<h2>Enviar el Excel por WhatsApp</h2>
+  <p>En Android, Chrome no deja pasar archivos de Excel directo a WhatsApp. Se hace en 2 pasos:</p>
+  <button class="big" id="pGuardar">1. Guardar el Excel en el equipo</button>
+  <p class="hint" style="text-align:left;margin:0">Si sale un letrero que dice <b>Descargar</b>, tóquelo.</p>
+  <a class="big wa" href="https://wa.me/?text=${encodeURIComponent('Excel de Vaquero: '+name)}" target="_blank" rel="noopener">2. Abrir WhatsApp</a>
+  <ol class="pasos"><li>Elija el chat.</li><li>Toque el clip 📎 → <b>Documento</b>.</li><li>Elija <b>${esc(name)}</b> (sale de primero en recientes o en Descargas).</li></ol>
+  <p class="hint" style="text-align:left">Otra forma: app <b>Archivos</b> → Descargas → mantenga presionado el archivo → <b>Compartir</b> → WhatsApp o Drive.</p>
   <button class="big sec" data-a="closeM">Cerrar</button>`);
+  m.querySelector('#pGuardar').onclick=async e=>{ bajar(name,blob); await marcarDescargado(); e.target.textContent='✓ Excel guardado (tocar para guardar de nuevo)'; };
 }
 
 /* ---- leer Excel (mismo formato de SG que Corral) ---- */

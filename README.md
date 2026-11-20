@@ -12,7 +12,7 @@ Publicada en: https://juandavidgr9-pastosydatos.github.io/vaquero/
   - Crías: edad en meses y días, sexo, lote, color, madre (avisa si la madre está en otro lote).
   - Levante (HL/ML): último peso y fecha, GMD anterior, edad en meses.
   - Los comentarios de SG salen destacados y se marcan palabras clave: HUÉRFANO, DESCARTE, VENTA, ENFERMO, COJERA, MASTITIS, ABORTO, ADOPTADO, etc. (lista `CLAVES` al inicio de `app.js`).
-- **Movimientos**: busca el animal, elige el lote destino (botones rápidos con los últimos lotes usados) y mueve. Si es una vaca con crías registradas (CH/CM con ese "# Madre"), **la cría se mueve siempre con la madre**. Deshacer en el aviso. Arriba, "Ver movimientos realizados": resumen origen → destino, cuántos quedan en el lote de origen y últimos movimientos con "Deshacer".
+- **Movimientos**: busca el animal, elige el lote destino (botones rápidos con los últimos lotes usados) y mueve. Si es una vaca con crías registradas (CH/CM con ese "# Madre"), **la cría se mueve siempre con la madre**, y si se mueve una cría, **se mueve también su madre** (y las otras crías de esa madre). Deshacer en el aviso. Arriba, "Ver movimientos realizados": resumen origen → destino, cuántos quedan en el lote de origen y últimos movimientos con "Deshacer".
 - **Conteo**: elige el lote y toca el botón grande; cada toque suena fuerte y vibra, cada 10 suena un tono doble. Muestra si coincide con el inventario actual del lote (faltan / sobran). −1, Reiniciar, Sonido sí/no. Los conteos guardados van al Excel.
 - **Archivo**: subir Excel de SG (pide nombre de finca y fecha de creación del Excel, DD/MM/AAAA), descargar Excel, enviar por WhatsApp/Drive.
 
@@ -36,3 +36,8 @@ Hojas: Inventario, Movimientos (historial completo), Resumen movimientos, Inv. l
 ## Versión 1.0.2
 - Corrige la publicación 1.0.1, en la que por error se subieron archivos de Corral al repositorio de Vaquero y el enlace de Vaquero abría Corral.
 - Al actualizarse, Vaquero quita de los equipos los archivos de Corral que quedaron guardados con la dirección de Vaquero. No toca la app Corral ni sus datos.
+
+## Versión 1.0.3
+- Al mover una cría se mueve también su madre (y las otras crías de esa madre). Deshacer devuelve a todos.
+- Android: "Enviar por WhatsApp o Drive" ahora es en 2 pasos con botones: 1. Guardar el Excel en el equipo, 2. Abrir WhatsApp y adjuntarlo como Documento. Chrome en Android no permite pasar un Excel directo a WhatsApp desde una app web.
+- Excel: hoja Resumen movimientos con columna "Con su cría"; en Movimientos el motivo dice con qué animal se movió.

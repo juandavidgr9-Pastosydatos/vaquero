@@ -1,7 +1,7 @@
 // Guarda Vaquero en el equipo para que abra sin internet.
 // Los datos de los animales NO pasan por aquí: viven en IndexedDB ("vaquero").
 // Regla del dominio compartido con Corral: solo se borran cachés que empiecen por "vaquero-".
-const CACHE = 'vaquero-v1.0.2';
+const CACHE = 'vaquero-v1.0.3';
 const FILES = ['./', './index.html', './app.js', './styles.css', './vendor/xlsx.mini.min.js',
   './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const llenar = () => caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, {cache: 'reload'}))));
