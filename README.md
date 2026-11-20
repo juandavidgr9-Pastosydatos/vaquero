@@ -47,3 +47,6 @@ Hojas: Inventario, Movimientos (historial completo), Resumen movimientos, Inv. l
 - Nueva pestaña Mapa (entre Conteo y Archivo): potreros desde KML/KMZ y simulación de rotaciones con calculadora de carga, guardadas con nombre y color.
 - El mapa y las rotaciones van en el Excel (hojas Potreros y Rotaciones, y en `_respaldo` para continuar en otro equipo). Cargar otro Excel de SG no borra el mapa.
 - Base IndexedDB "vaquero" versión 2 (almacén nuevo "mapa"); los datos anteriores se conservan.
+
+## Versión 1.1.1
+- iPhone: corrige que al elegir el KML no pasaba nada. El selector de archivos del mapa ahora va fijo en la página y sin filtro de tipo (igual que el del Excel).

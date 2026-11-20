@@ -76,17 +76,18 @@ async function leerArchivoMapa(file){
   }
   return leerKML(new TextDecoder().decode(buf), file.name);
 }
-function pedirKML(){
-  const inp=document.createElement('input'); inp.type='file'; inp.accept='.kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz';
-  inp.onchange=async()=>{ const f=inp.files[0]; if(!f) return;
-    let m; try{ m=await leerArchivoMapa(f); }catch(e){ return alertBox('Mapa no válido',e.message); }
-    const tot=m.pots.reduce((s,p)=>s+p.ha,0);
-    if(MAPA&&!await confirmBox('Reemplazar mapa',`El archivo tiene ${m.pots.length} potreros (${num(tot,2)} ha). Se reemplaza el mapa actual. Las rotaciones guardadas siguen en el histórico, y solo se dibujan si el mapa es el mismo.`,'Reemplazar mapa')) return;
-    MAPA=m; SIM=null; VB=null; prepararMapa(); await mapaGuardar(true);
-    renderMain(); toast(`Mapa cargado: ${m.pots.length} potreros, ${num(tot,2)} ha`);
-  };
-  inp.click();
+/* El selector de archivos va fijo en la página (index.html, #kmlFile) y sin filtro de tipo:
+   en iPhone, un selector creado al vuelo o con filtro .kml no avisa cuando se elige el archivo. */
+function pedirKML(){ const inp=$('#kmlFile'); inp.value=''; inp.click(); }
+async function alElegirKML(f){
+  if(!/\.(kml|kmz)$/i.test(f.name)&&!/kml|kmz|xml|zip/i.test(f.type||'')) return alertBox('Archivo no válido',`"${f.name}" no es un KML ni un KMZ. Elija el archivo de los potreros.`);
+  let m; try{ m=await leerArchivoMapa(f); }catch(e){ return alertBox('Mapa no válido',e.message); }
+  const tot=m.pots.reduce((s,p)=>s+p.ha,0);
+  if(MAPA&&!await confirmBox('Reemplazar mapa',`El archivo tiene ${m.pots.length} potreros (${num(tot,2)} ha). Se reemplaza el mapa actual. Las rotaciones guardadas siguen en el histórico, y solo se dibujan si el mapa es el mismo.`,'Reemplazar mapa')) return;
+  MAPA=m; SIM=null; VB=null; prepararMapa(); await mapaGuardar(true);
+  renderMain(); toast(`Mapa cargado: ${m.pots.length} potreros, ${num(tot,2)} ha`);
 }
+document.addEventListener('change',e=>{ if(e.target.id==='kmlFile'){ const f=e.target.files[0]; if(f) alElegirKML(f); } });
 
 /* ---------- geometría en metros para dibujar ---------- */
 function dentro(x,y,rings){ let c=false;

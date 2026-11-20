@@ -1,6 +1,6 @@
 'use strict';
 /* Vaquero - Pastos & Datos. Todo vive en el equipo (IndexedDB "vaquero"). Basada en Corral 5.2.0. */
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const BACKUP_SHEET = '_respaldo', APP_ID = 'APP_VAQUERO';
 const CFG = { recordarCada: 10 };   // cada cuántos cambios recuerda descargar el Excel
 const EA_TXT = {VP:'Vaca Parida',VS:'Vaca Seca',NV:'Novilla Vientre',HL:'Hembra Levante',CH:'Cría Hembra',CM:'Cría Macho',TR:'Toro',ML:'Macho Levante'};
