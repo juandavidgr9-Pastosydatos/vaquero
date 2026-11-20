@@ -1,6 +1,6 @@
 'use strict';
 /* Vaquero - Pastos & Datos. Todo vive en el equipo (IndexedDB "vaquero"). Basada en Corral 5.2.0. */
-const VERSION = '1.0.3';
+const VERSION = '1.1.0';
 const BACKUP_SHEET = '_respaldo', APP_ID = 'APP_VAQUERO';
 const CFG = { recordarCada: 10 };   // cada cuántos cambios recuerda descargar el Excel
 const EA_TXT = {VP:'Vaca Parida',VS:'Vaca Seca',NV:'Novilla Vientre',HL:'Hembra Levante',CH:'Cría Hembra',CM:'Cría Macho',TR:'Toro',ML:'Macho Levante'};
@@ -13,6 +13,7 @@ const TABS = [
   ['busc','Buscar','<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/>'],
   ['mov','Movimientos','<path d="M4 8h14M15 5l3 3-3 3M20 16H6M9 13l-3 3 3 3"/>'],
   ['cont','Conteo','<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'],
+  ['mapa','Mapa','<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/>'],
   ['file','Archivo','<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>']
 ];
 
@@ -110,10 +111,11 @@ function buscar(qRaw){
 
 /* ---------- IndexedDB (base "vaquero", nunca "corral") ---------- */
 function openDB(){ return new Promise((ok,no)=>{
-  const r=indexedDB.open('vaquero',1);
+  const r=indexedDB.open('vaquero',2);
   r.onupgradeneeded=()=>{ const d=r.result;
     if(!d.objectStoreNames.contains('meta')) d.createObjectStore('meta');
-    if(!d.objectStoreNames.contains('animals')) d.createObjectStore('animals',{keyPath:'id'}); };
+    if(!d.objectStoreNames.contains('animals')) d.createObjectStore('animals',{keyPath:'id'});
+    if(!d.objectStoreNames.contains('mapa')) d.createObjectStore('mapa'); };
   r.onsuccess=()=>ok(r.result); r.onerror=()=>no(r.error);
 });}
 const txDone = t => new Promise((ok,no)=>{ t.oncomplete=ok; t.onerror=()=>no(t.error); t.onabort=()=>no(t.error); });
@@ -182,14 +184,15 @@ function renderTop(){
     (meta?`<button class="pill ${c?'warn':''}" data-a="goFile">${c?`⚠ ${c} sin descargar`:'Respaldado ✓'}</button>`:'');
 }
 function renderNav(){
-  $('#nav').innerHTML=TABS.map(([k,t,ic])=>`<button data-tab="${k}" class="${k===tab?'on':''}" style="${!meta&&k!=='file'?'opacity:.35':''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${t}</button>`).join('');
+  $('#nav').innerHTML=TABS.map(([k,t,ic])=>`<button data-tab="${k}" class="${k===tab?'on':''}" style="${!meta&&k!=='file'&&k!=='mapa'?'opacity:.35':''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg>${t}</button>`).join('');
 }
 function renderMain(){
   const m=$('#main');
-  if(!meta && tab!=='file') tab='file';
+  if(!meta && tab!=='file' && tab!=='mapa') tab='file';
   if(tab==='file'){ m.className='narrow'; m.innerHTML=viewFile(); }
   else if(tab==='inv'){ m.className='wide'; m.innerHTML=viewInventario(); }
   else if(tab==='cont'){ m.className='cont'; m.innerHTML=viewConteo(); }
+  else if(tab==='mapa'){ m.className='mapa'; m.innerHTML=viewMapa(); montarMapa(); }
   else if(tab==='mov'&&movVista){ m.className='wide'; m.innerHTML=viewMov(); }
   else {
     const s=S[tab], a=s.id?animals.get(s.id):null;
@@ -491,8 +494,9 @@ function construirExcel(){
     hoja(wb,nom,['Lote',...cols,'Total'],rows);
   }
   hoja(wb,'Conteos',['Fecha','Hora','Lote','Contados','Esperados','Diferencia'],(meta.conteos||[]).map(c=>[fecha(c.ts),hora(c.ts),c.lote||'Conteo libre',c.n,c.esp??'',c.esp==null?'':c.n-c.esp]));
+  hojasMapa(wb);
   const m={...meta,order:undefined,cambios:0};
-  const bk=XLSX.utils.aoa_to_sheet([[APP_ID,1,order.length],['META',JSON.stringify(m)],...all.map(a=>[a.id,JSON.stringify(a)])]);
+  const bk=XLSX.utils.aoa_to_sheet([[APP_ID,1,order.length],['META',JSON.stringify(m)],...all.map(a=>[a.id,JSON.stringify(a)]),...filasRespaldoMapa()]);
   XLSX.utils.book_append_sheet(wb,bk,BACKUP_SHEET);
   wb.Workbook={Sheets:wb.SheetNames.map(n=>({name:n,Hidden:n===BACKUP_SHEET?1:0}))};
   return wb;
@@ -578,18 +582,18 @@ function leerRespaldo(wb){
   const rows=XLSX.utils.sheet_to_json(wb.Sheets[BACKUP_SHEET],{header:1,raw:true,defval:''});
   if(rows[0][0]==='APP_CORRAL') throw new Error('Este es un archivo de avance de Corral. En Vaquero cargue el Excel de Software Ganadero o un avance descargado de Vaquero.');
   if(rows[0][0]!==APP_ID||rows[1][0]!=='META') throw new Error('El archivo de avance está dañado.');
-  const m=JSON.parse(rows[1][1]), list=rows.slice(2).filter(r=>r[1]).map(r=>JSON.parse(r[1]));
+  const m=JSON.parse(rows[1][1]), list=rows.slice(2).filter(r=>r[1]&&r[0]!=='MAPA').map(r=>JSON.parse(r[1]));
   if(list.length!==rows[0][2]) throw new Error('El archivo de avance está incompleto.');
-  return {m,list};
+  return {m,list,mapa:leerMapaRespaldo(rows)};
 }
 const lotesDe = list => [...new Set(list.map(a=>a.lote).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
 async function alSubir(file){
   let wb; try{ wb=XLSX.read(await file.arrayBuffer(),{type:'array'}); }catch(e){ return alertBox('No se pudo leer','El archivo no es un Excel válido.'); }
   try{
     if(wb.SheetNames.includes(BACKUP_SHEET)){
-      const {m,list}=leerRespaldo(wb), mov=list.filter(a=>a.w.mov).length;
+      const {m,list,mapa}=leerRespaldo(wb), mov=list.filter(a=>a.w.mov).length;
       return pasoReemplazo(`Archivo de avance de ${m.finca}: ${list.length} animales, ${mov} movidos.`,null,async()=>{
-        await replaceAll({...m,cambios:0},list); S={busc:{},mov:{}}; tab='inv'; render(); toast('Avance restaurado');
+        await replaceAll({...m,cambios:0},list); await restaurarMapa(mapa); S={busc:{},mov:{}}; tab='inv'; render(); toast('Avance restaurado');
       });
     }
     const {list,total,dups}=leerSG(wb);
@@ -665,9 +669,10 @@ function nuevoLote(){
 document.addEventListener('pointerdown',e=>{ if(e.target.closest('#cntBtn')){ e.preventDefault(); contar(); } });
 document.addEventListener('click',async e=>{
   if(!e.target.closest('#toast')) $('#toast').classList.remove('show');
-  const t=e.target.closest('button,[data-mv],[data-tlote]'); if(!t||t.id==='cntBtn') return;
+  const t=e.target.closest('button,[data-mv],[data-tlote],[data-m]'); if(!t||t.id==='cntBtn') return;
   const d=t.dataset;
-  if(d.tab){ if(!meta&&d.tab!=='file') return; if(d.tab!==tab&&!await salir()) return; tab=d.tab; $('#main').scrollTop=0; return render(); }
+  if(d.tab){ if(!meta&&d.tab!=='file'&&d.tab!=='mapa') return; if(d.tab!==tab&&!await salir()) return; tab=d.tab; $('#main').scrollTop=0; return render(); }
+  if(d.m) return accionMapa(d.m,d);
   if(d.k!==undefined){
     const s=S[tab];
     if(d.k==='del') s.q=(s.q||'').slice(0,-1);
@@ -705,6 +710,7 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('input',e=>{
   const el=e.target;
+  if(el.dataset.mc) return inputMapa(el);
   if(el.id==='q'){ S[tab].q=el.value.toUpperCase(); return pintarResultados(); }
   if(el.classList.contains('fecha')){ const n=el.value.replace(/\D/g,'').slice(0,8); el.value=n.length>4?`${n.slice(0,2)}/${n.slice(2,4)}/${n.slice(4)}`:n.length>2?`${n.slice(0,2)}/${n.slice(2)}`:n; const er=document.getElementById(el.id+'E'); if(er) er.textContent=''; }
 });
@@ -732,7 +738,7 @@ window.addEventListener('beforeunload',e=>{ if(meta&&((meta.cambios||0)>0||sinGu
       buscarV(); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) buscarV(); });
     }).catch(()=>{});
   }
-  try{ db=await openDB(); await loadDB(); }
+  try{ db=await openDB(); await loadDB(); await mapaCargar(); }
   catch(e){ await alertBox('Error de almacenamiento','Este navegador no permite guardar datos. Salga del modo privado o use otro navegador.'); }
   if(meta) await pedirPersistencia();
   render();
